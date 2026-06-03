@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch sử cảnh báo - Driver Monitoring</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #00fff0; margin-bottom: 10px; }
+        
+        .nav-buttons {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            background-color: #0f3460;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn:hover { background-color: #e94560; }
+        .btn-danger { background-color: #b91c1c; }
+        .btn-danger:hover { background-color: #991b1b; }
+
+        .table-container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #162447;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #1f4068;
+        }
+
+        th {
+            background-color: #1f4068;
+            color: #00fff0;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        tr:hover { background-color: #1f4068; }
+
+        .badge-danger {
+            background-color: #e94560;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>LỊCH SỬ CẢNH BÁO VI PHẠM</h1>
+    
+    <div class="nav-buttons">
+        <a href="/" class="btn">🔙 Quay lại Camera (Real-time)</a>
+        <button class="btn btn-danger" onclick="clearHistory()">🗑️ Xóa toàn bộ lịch sử</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Thời gian vi phạm</th>
+                    <th>Loại cảnh báo</th>
+                    <th>Mức độ</th>
+                </tr>
+            </thead>
+            <tbody id="history-table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Hàm gọi API lấy dữ liệu lịch sử và vẽ ra bảng
+        function fetchHistory() {
+            fetch('/api/history')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('history-table-body');
+                    tbody.innerHTML = ''; // Xóa trắng bảng cũ
+
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Hệ thống ghi nhận tài xế lái xe an toàn, chưa có vi phạm nào!</td></tr>';
+                        return;
+                    }
+
+                    // Lặp qua mảng dữ liệu và tạo dòng (row)
+                    data.forEach((item, index) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td>${item.time}</td>
+                            <td>${item.type}</td>
+                            <td><span class="badge-danger">${item.level}</span></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => console.error('Lỗi lấy lịch sử:', err));
+        }
+
+        // Hàm gọi API để xóa dữ liệu lịch sử trên Server
+        function clearHistory() {
+            if (confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử vi phạm không?")) {
+                fetch('/api/history/clear', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.ok) {
+                            fetchHistory(); // Tải lại bảng sau khi xóa
+                        }
+                    });
+            }
+        }
+
+        // Tải dữ liệu ngay khi mở trang và cập nhật mỗi 5 giây
+        fetchHistory();
+        setInterval(fetchHistory, 5000);
+    </script>
+</body>
+</html>

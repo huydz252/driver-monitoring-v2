@@ -1,0 +1,5 @@
+{
+  "earThresh": 0.20,
+  "marThresh": 0.55,
+  "drowsierFrameThres": 20
+}

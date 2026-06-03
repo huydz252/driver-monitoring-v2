@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Monitoring Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-bottom: 20px; color: #00fff0; }
+        .dashboard-container {
+            display: flex;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+        .video-box {
+            flex: 2;
+            background-color: #162447;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .video-box img { width: 100%; height: auto; display: block; }
+        .info-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .card {
+            background-color: #1f4068;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .card h3 { margin: 0 0 10px 0; color: #e43f5a; }
+        .value { font-size: 24px; font-weight: bold; }
+
+        /* Căn giữa nút điều hướng */
+        .action-menu {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .btn-neon {
+            display: inline-block;
+            padding: 10px 25px;
+            background-color: #0f3460;
+            color: #00fff0 !important; /* Ép buộc màu xanh neon, xóa màu tím */
+            text-decoration: none !important; /* Xóa gạch chân xấu xí */
+            font-weight: bold;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #00fff0;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 8px rgba(0, 255, 240, 0.4);
+            font-family: inherit;
+        }
+        .btn-neon:hover {
+            background-color: #00fff0;
+            color: #1a1a2e !important; /* Đổi màu chữ khi di chuột */
+            box-shadow: 0 0 20px rgba(0, 255, 240, 0.8);
+            transform: scale(1.05); /* Phóng to nhẹ */
+        }
+        .action-menu {
+            text-align: center;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+        
+        /* Trạng thái đổi màu động */
+        .status-tỉnh-táo { background-color: #1b8a5a !important; }
+        .status-mệt-mỏi { background-color: #d97706 !important; }
+        .status-buồn-ngủ { background-color: #b91c1c !important; animation: blink 1s infinite; }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>HỆ THỐNG GIÁM SÁT TÀI XẾ - REAL-TIME AI</h1>
+
+    <div class="dashboard-container">
+        <div class="video-box">
+            <img src="/video_feed" alt="Webcam Stream">
+        </div>
+
+        <div class="info-box">
+            <div id="status-card" class="card status-tỉnh-táo" style="transition: background-color 0.4s;">
+                <h3 style="color: #fff;">TRẠNG THÁI</h3>
+                <div id="status-val" class="value">ĐANG KIỂM TRA...</div>
+            </div>
+
+            <div class="card">
+                <h3>CHỈ SỐ SINH TRẮC</h3>
+                <p>EAR (Mắt): <span id="ear-val" class="value" style="color: #00fff0;">0.00</span></p>
+                <p>MAR (Miệng): <span id="mar-val" class="value" style="color: #00fff0;">0.00</span></p>
+            </div>
+
+            <div class="card">
+                <h3>BỘ ĐẾM KHUNG HÌNH</h3>
+                <p>Số khung hình nhắm mắt: <span id="counter-val" class="value">0</span> / 20</p>
+            </div>
+            <div class="action-menu">
+                <a href="/history.html" class="btn-neon">📜 Xem Lịch Sử</a>
+            </div>
+        </div>
+    </div>
+
+    <audio id="alert-sound" src="/sound/warning5.mp3" loop></audio>
+
+    <script>
+        const statusCard = document.getElementById('status-card');
+        const statusVal = document.getElementById('status-val');
+        const earVal = document.getElementById('ear-val');
+        const marVal = document.getElementById('mar-val');
+        const counterVal = document.getElementById('counter-val');
+        const alertSound = document.getElementById('alert-sound');
+
+        // Biến cờ kiểm tra xem người dùng đã tương tác với trang web chưa
+        let isUserInteracted = false;
+
+        // Lắng nghe sự kiện click bất kỳ trên màn hình để kích hoạt quyền phát âm thanh công khai
+        document.addEventListener('click', () => {
+            if (!isUserInteracted) {
+                isUserInteracted = true;
+                console.log("🔊 Quyền phát âm thanh hệ thống đã được kích hoạt!");
+            }
+        }, { once: true }); // Chỉ chạy duy nhất 1 lần
+
+        // Vòng lặp truy vấn API bất đồng bộ liên tục từ Flask Backend (Mỗi 200ms)
+        setInterval(() => {
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    // 1. Cập nhật các chỉ số sinh trắc học thời gian thực lên Dashboard
+                    earVal.innerText = data.ear.toFixed(2);
+                    marVal.innerText = data.mar.toFixed(2);
+                    counterVal.innerText = data.counter;
+                    statusVal.innerText = data.status.toUpperCase();
+
+                    // 2. Thay đổi Class CSS động để đổi màu sắc giao diện theo trạng thái nhận diện của SVM
+                    statusCard.className = "card status-" + data.status;
+
+                    // 3. XỬ LÝ ĐỒNG BỘ ÂM THANH CẢNH BÁO TRÊN TRÌNH DUYỆT
+                    if (data.danger === true) {
+                        // Nếu lõi AI báo nguy hiểm và người dùng đã click tương tác
+                        if (isUserInteracted) {
+                            if (alertSound.paused) {
+                                alertSound.play().catch(err => {
+                                    console.error("Lỗi thực thi Audio trình duyệt: ", err);
+                                });
+                            }
+                        } else {
+                            // Nhắc nhở tài xế click chuột nếu họ vừa F5 lại trang mà chưa tương tác
+                            statusVal.innerText = "BUỒN NGỦ (CLICK MÀN HÌNH ĐỂ BẬT CÒI)";
+                        }
+                    } else {
+                        // Nếu tài xế tỉnh táo trở lại, tắt nhạc và reset mốc thời gian phát lập tức
+                        if (!alertSound.paused) {
+                            alertSound.pause();
+                            alertSound.currentTime = 0;
+                        }
+                    }
+                })
+                .catch(err => console.error("Lỗi đồng bộ dữ liệu API:", err));
+        }, 200);
+    </script>
+</body>
+</html>
